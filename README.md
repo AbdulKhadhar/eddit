@@ -1,7 +1,80 @@
-# Tauri + React + Typescript
+# **Eddit 🎬**  
+*A simple editing tool for cutting, compressing, and processing visuals.*  
 
-This template should help get you started developing with Tauri, React and Typescript in Vite.
 
-## Recommended IDE Setup
+## **✨ Features**  
+- 📌 **Cut videos** into multiple segments effortlessly.  
+- 🎭 **Add custom intro videos** to each segment.  
+- 🔥 **Compress videos** for optimized storage and sharing.  
+- 🚀 **Fast processing** powered by **FFmpeg**.  
+- 🎨 **Modern UI** with **Tailwind CSS 4**.  
+- 🖥 **Cross-platform support** with **Tauri**.  
 
-- [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+---
+
+## **🛠 Tech Stack**  
+- **Frontend**: React (TypeScript) + Tailwind CSS 4  
+- **Backend**: Tauri (Rust)  
+- **Video Processing**: FFmpeg  
+
+---
+
+## **🚀 Installation & Setup**  
+
+### **Prerequisites**  
+Make sure you have the following installed:  
+- [Node.js](https://nodejs.org/)  
+- [Rust & Cargo](https://www.rust-lang.org/tools/install)  
+- [FFmpeg](https://ffmpeg.org/download.html)  
+
+### **Clone the Repository**  
+```sh
+git clone https://github.com/yourusername/eddit.git
+cd eddit
+```
+
+### **Install Dependencies**  
+```sh
+npm install
+```
+
+### **Run the App**
+```sh
+npm run tauri dev
+```
+
+### **Build for Production**
+```sh
+npm run tauri build
+```
+
+## 🤝 Contributing  
+We welcome contributions from the community! 🎉  
+
+To contribute:  
+1. **Fork** the repository  
+2. **Create a new branch** (`git checkout -b feature-xyz`)  
+3. **Commit your changes** (`git commit -m "Added feature xyz"`)  
+4. **Push to your branch** (`git push origin feature-xyz`)  
+5. **Open a Pull Request**  
+
+Please follow the project's coding style and guidelines when submitting PRs.  
+
+---
+
+## 📜 License  
+This project is licensed under the [MIT License](LICENSE).  
+
+---
+
+## Support  
+If you find this tool helpful, consider giving it a ⭐ on GitHub!  
+
+---
+
+## 📬 Contact  
+For issues, suggestions, or questions, feel free to:  
+- Open an [issue](https://github.com/AbdulKhadhar/eddit/issues) on GitHub  
+- Reach out on [LinkedIn](https://www.linkedin.com/in/abdul-khadar/)  
+
+Happy editing! 🎬✨  
