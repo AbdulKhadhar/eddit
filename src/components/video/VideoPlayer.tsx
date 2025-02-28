@@ -1,9 +1,7 @@
 "use client";
 
 import React, { useRef, useState, useEffect } from "react";
-import {
-    Play, Pause, Volume2, VolumeX,
-} from "lucide-react";
+import { Play, Pause, Volume2, VolumeX, Bug } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { useVideoStore } from "../../contexts/videoStore";
 
@@ -39,7 +37,11 @@ const VolumeSlider = ({ value, onChange }: { value: number, onChange: (value: nu
     );
 };
 
-const IconButton = ({ onClick, children, className = "" }: { onClick: () => void, children: React.ReactNode, className?: string }) => (
+const IconButton = ({ onClick, children, className = "" }: { 
+    onClick: (event: React.MouseEvent<HTMLButtonElement>) => void, 
+    children: React.ReactNode, 
+    className?: string 
+}) => (
     <button
         onClick={onClick}
         className={`p-2 text-white rounded-full hover:bg-gray-700 transition-colors ${className}`}
@@ -61,6 +63,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onTimeUpdate }) => {
     const [isMuted, setIsMuted] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
     const [playbackSpeed, setPlaybackSpeed] = useState(1);
+    const [showDebug, setShowDebug] = useState(false);
 
     async function getVideoStreamUrl(videoPath: string): Promise<string | null> {
         if (!videoPath) {
@@ -77,7 +80,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onTimeUpdate }) => {
 
             const encodedPath = encodeURIComponent(videoPath);
             const fullUrl = `${serverUrl}/video/${encodedPath}`;
-            console.log(videoUrl);
             setVideoUrl(fullUrl);
             return fullUrl;
         } catch (err) {
@@ -117,9 +119,11 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onTimeUpdate }) => {
 
     const togglePlay = () => {
         if (!videoRef.current) return;
-
+    
         if (videoRef.current.paused) {
-            videoRef.current.play().then(() => setIsPlaying(true)).catch(() => setError("Failed to play video."));
+            videoRef.current.play()
+                .then(() => setIsPlaying(true))
+                .catch((err) => setError(`Playback Error: ${err.message || err}`));
         } else {
             videoRef.current.pause();
             setIsPlaying(false);
@@ -173,10 +177,28 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onTimeUpdate }) => {
                 onClick={togglePlay}
             />
 
-            {/* Controls Container (Appears on Hover) */}
-            <div
-                className={`absolute inset-x-0 bottom-0 bg-gray-800 bg-opacity-90 p-3 transition-opacity ${isHovered ? "opacity-100" : "opacity-0"} duration-300`}
+            {/* Debug Button */}
+            <IconButton
+                onClick={(event) => {
+                    event.stopPropagation(); // Prevents pausing video
+                    setShowDebug(!showDebug);
+                }}
+                className="absolute top-2 right-2 bg-gray-800 bg-opacity-50 hover:bg-opacity-100"
             >
+                <Bug className="h-5 w-5 text-white" />
+            </IconButton>
+
+            {/* Debug Info Box */}
+            {showDebug && (
+                <div className="absolute top-10 right-2 bg-gray-800 text-white p-2 rounded-lg text-xs">
+                    <p><strong>File:</strong> {videoPath}</p>
+                    <p><strong>Streaming:</strong> {videoUrl ? videoUrl : "No"}</p>
+                    {error && <p><strong>Error:</strong> {error}</p>}
+                </div>
+            )}
+
+            {/* Controls */}
+            <div className={`absolute inset-x-0 bottom-0 bg-gray-800 bg-opacity-90 p-3 transition-opacity ${isHovered ? "opacity-100" : "opacity-0"} duration-300`}>
                 <div className="flex items-center mb-2">
                     <span className="text-white text-xs mr-2">{Math.floor(currentTime / 60)}:{("0" + Math.floor(currentTime % 60)).slice(-2)}</span>
                     <ProgressSlider value={currentTime} max={duration || 100} onChange={handleProgressChange} />
@@ -184,35 +206,20 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onTimeUpdate }) => {
                 </div>
 
                 <div className="flex justify-between items-center">
-    <div className="flex space-x-2 items-center">
-        <IconButton onClick={togglePlay}>
-            {isPlaying ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6" />}
-        </IconButton>
-        
-        <div className="flex items-center space-x-2">
-            <IconButton onClick={toggleMute}>
-                {isMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
-            </IconButton>
-            <VolumeSlider value={isMuted ? 0 : volume} onChange={handleVolumeChange} />
-        </div>
-    </div>
+                    <div className="flex items-center space-x-2">
+                        <IconButton onClick={togglePlay}>{isPlaying ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6" />}</IconButton>
+                        <IconButton onClick={toggleMute}>{isMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}</IconButton>
+                        <VolumeSlider value={isMuted ? 0 : volume} onChange={handleVolumeChange} />
+                    </div>
 
-    <div className="flex items-center">
-        <label className="text-white text-sm">Speed:</label>
-        <select 
-            value={playbackSpeed} 
-            onChange={handleSpeedChange} 
-            className="ml-2 p-1 rounded bg-gray-700 text-white"
-        >
-            <option value="0.5">0.5x</option>
-            <option value="1">1x</option>
-            <option value="1.5">1.5x</option>
-            <option value="2">2x</option>
-            <option value="16">16x</option>
-        </select>
-    </div>
-</div>
-
+                    <select value={playbackSpeed} onChange={handleSpeedChange} className="p-1 rounded bg-gray-700 text-white">
+                        <option value="0.5">0.5x</option>
+                        <option value="1">1x</option>
+                        <option value="1.5">1.5x</option>
+                        <option value="2">2x</option>
+                        <option value="16">16x</option>
+                    </select>
+                </div>
             </div>
         </div>
     );
