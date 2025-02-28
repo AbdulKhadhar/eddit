@@ -61,7 +61,7 @@ jobs:
             rust-${{ runner.os }}-
 
       - name: Build Windows Executables (msi & exe)
-        run: pnpm tauri build --ci --debug=false
+        run: pnpm tauri build --ci
         env:
           RUSTFLAGS: "-C target-cpu=native"  # Optimize for runner CPU
           CARGO_INCREMENTAL: "1"  # Enable incremental builds
