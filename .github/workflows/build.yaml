@@ -16,12 +16,11 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 1  # Faster checkout
-          lfs: true  # Enables Git LFS to fetch large files
 
-      - name: Install Git LFS
+      - name: Unzip ffmpeg and ffprobe
         run: |
-          git lfs install
-          git lfs pull  # Fetch large files like ffmpeg.exe, ffprobe.exe
+          Expand-Archive -Path src-tauri/bin/ffmpeg.zip -DestinationPath src-tauri/bin/
+          Expand-Archive -Path src-tauri/bin/ffprobe.zip -DestinationPath src-tauri/bin/
 
       - name: Setup Node.js
         uses: actions/setup-node@v4

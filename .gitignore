@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+
+src-tauri/bin/ffmpeg.exe
+src-tauri/bin/ffprobe.exe
