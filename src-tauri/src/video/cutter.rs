@@ -1,11 +1,14 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
-use super::super::commands::video::VideoMetadata;
 use anyhow::{Result, anyhow};
 use serde_json::Value;
+use super::super::commands::video::VideoMetadata;
+use crate::utils::{get_ffmpeg_path, get_ffprobe_path}; 
 
 pub fn get_metadata(video_path: &str) -> Result<VideoMetadata> {
-    let output = Command::new("ffprobe")
+    let ffprobe_path = get_ffprobe_path(); 
+
+    let output = Command::new(ffprobe_path)
         .args(&[
             "-v", "quiet",
             "-print_format", "json",
@@ -20,8 +23,6 @@ pub fn get_metadata(video_path: &str) -> Result<VideoMetadata> {
     }
     
     let json_output: Value = serde_json::from_slice(&output.stdout)?;
-    
-    // Extract video stream information
     let streams = json_output["streams"].as_array()
         .ok_or_else(|| anyhow!("No streams found"))?;
     
@@ -29,18 +30,15 @@ pub fn get_metadata(video_path: &str) -> Result<VideoMetadata> {
         .find(|s| s["codec_type"].as_str().unwrap_or("") == "video")
         .ok_or_else(|| anyhow!("No video stream found"))?;
     
-    // Extract duration from format section (more reliable)
     let duration_str = json_output["format"]["duration"].as_str()
         .ok_or_else(|| anyhow!("No duration found"))?;
     let duration = duration_str.parse::<f64>()?;
     
-    // Extract other metadata
     let width = video_stream["width"].as_u64()
         .ok_or_else(|| anyhow!("No width found"))? as u32;
     let height = video_stream["height"].as_u64()
         .ok_or_else(|| anyhow!("No height found"))? as u32;
     
-    // Extract framerate as a fraction and calculate
     let frame_rate_str = video_stream["r_frame_rate"].as_str()
         .ok_or_else(|| anyhow!("No frame rate found"))?;
     let parts: Vec<&str> = frame_rate_str.split('/').collect();
@@ -52,7 +50,6 @@ pub fn get_metadata(video_path: &str) -> Result<VideoMetadata> {
     let denominator = parts[1].parse::<f64>()?;
     let framerate = numerator / denominator;
     
-    // Get codec name
     let codec = video_stream["codec_name"].as_str()
         .unwrap_or("unknown").to_string();
     
@@ -72,21 +69,22 @@ pub fn cut_segment(
     output_dir: &str,
     output_name: &str
 ) -> Result<String> {
+    let ffmpeg_path = get_ffmpeg_path(); 
+
     let output_path = Path::new(output_dir)
         .join(format!("{}.mp4", output_name));
     
     let duration = end_time - start_time;
     
-    // Use FFmpeg to cut the segment
-    let status = Command::new("ffmpeg")
+    let status = Command::new(ffmpeg_path)
         .args(&[
             "-i", input_path,
             "-ss", &start_time.to_string(),
             "-t", &duration.to_string(),
-            "-c:v", "copy",  // Copy video codec to avoid re-encoding
-            "-c:a", "copy",  // Copy audio codec
+            "-c:v", "copy",
+            "-c:a", "copy",
             "-avoid_negative_ts", "make_zero",
-            "-y",  // Overwrite output files without asking
+            "-y",
             output_path.to_str().unwrap()
         ])
         .status()?;

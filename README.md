@@ -1,6 +1,20 @@
 # **Eddit 🎬**  
 *A simple editing tool for cutting, compressing, and processing visuals.*  
 
+<p align="center">
+  <img src="app-icon.png" alt="Eddit Icon" width="120">
+</p>
+
+![Build Status](https://github.com/AbdulKhadhar/eddit/actions/workflows/build.yaml/badge.svg)
+
+## 🚀 Download Latest Version
+
+| Platform | Installer |
+|----------|------------|
+| 🖥️ Windows (.msi) | [Download](https://github.com/AbdulKhadhar/eddit/releases/latest/download/eddit_0.1.0_x64_en-US.msi) |
+| 🖥️ Windows (.exe) | [Download](https://github.com/AbdulKhadhar/eddit/releases/latest/download/eddit_0.1.0_x64-setup.exe) |
+
+---
 
 ## **✨ Features**  
 - 📌 **Cut videos** into multiple segments effortlessly.  

@@ -1,144 +1,221 @@
-"use client"
+"use client";
 
-import React, { useRef, useState, useEffect } from "react"
-import { Play, Pause, Volume2, VolumeX } from "lucide-react"
-import { Slider } from "@/components/ui/slider"
-import { Button } from "@/components/ui/button"
-import { useVideoStore } from "../../contexts/videoStore"
-import { convertFileSrc } from "@tauri-apps/api/core"
+import React, { useRef, useState, useEffect } from "react";
+import {
+    Play, Pause, Volume2, VolumeX,
+} from "lucide-react";
+import { invoke } from "@tauri-apps/api/core";
+import { useVideoStore } from "../../contexts/videoStore";
 
 interface VideoPlayerProps {
-    onTimeUpdate?: (currentTime: number) => void
+    onTimeUpdate?: (currentTime: number) => void;
 }
+
+const ProgressSlider = ({ value, max, onChange }: { value: number, max: number, onChange: (value: number) => void }) => {
+    return (
+        <input
+            type="range"
+            min="0"
+            max={max}
+            step="0.1"
+            value={value}
+            onChange={(e) => onChange(parseFloat(e.target.value))}
+            className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+        />
+    );
+};
+
+const VolumeSlider = ({ value, onChange }: { value: number, onChange: (value: number) => void }) => {
+    return (
+        <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            value={value}
+            onChange={(e) => onChange(parseFloat(e.target.value))}
+            className="w-20 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+        />
+    );
+};
+
+const IconButton = ({ onClick, children, className = "" }: { onClick: () => void, children: React.ReactNode, className?: string }) => (
+    <button
+        onClick={onClick}
+        className={`p-2 text-white rounded-full hover:bg-gray-700 transition-colors ${className}`}
+    >
+        {children}
+    </button>
+);
 
 const VideoPlayer: React.FC<VideoPlayerProps> = ({ onTimeUpdate }) => {
-    const { videoPath, metadata } = useVideoStore()
-    const videoRef = useRef<HTMLVideoElement>(null)
+    const { videoPath } = useVideoStore();
+    const videoRef = useRef<HTMLVideoElement | null>(null);
 
-    const [isPlaying, setIsPlaying] = useState(false)
-    const [currentTime, setCurrentTime] = useState(0)
-    const [volume, setVolume] = useState(1)
-    const [isMuted, setIsMuted] = useState(false)
+    const [isPlaying, setIsPlaying] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [videoUrl, setVideoUrl] = useState<string | null>(null);
+    const [currentTime, setCurrentTime] = useState(0);
+    const [duration, setDuration] = useState(0);
+    const [volume, setVolume] = useState(1);
+    const [isMuted, setIsMuted] = useState(false);
+    const [isHovered, setIsHovered] = useState(false);
+    const [playbackSpeed, setPlaybackSpeed] = useState(1);
 
-    // Convert file path for Tauri and load video
-    useEffect(() => {
-        if (videoPath && videoRef.current) {
-            const convertedSrc = convertFileSrc(videoPath)
-            console.log("Converted Video Path:", convertedSrc)
-            videoRef.current.src = convertedSrc
-            videoRef.current.load()
+    async function getVideoStreamUrl(videoPath: string): Promise<string | null> {
+        if (!videoPath) {
+            setError("Error: No video path provided.");
+            return null;
         }
-    }, [videoPath])
 
-    // Update current time when video plays
+        try {
+            const serverUrl = await invoke<string>("start_video_server", { port: 3001 });
+            if (!serverUrl) {
+                setError("Error: Video server did not return a valid URL.");
+                return null;
+            }
+
+            const encodedPath = encodeURIComponent(videoPath);
+            const fullUrl = `${serverUrl}/video/${encodedPath}`;
+            console.log(videoUrl);
+            setVideoUrl(fullUrl);
+            return fullUrl;
+        } catch (err) {
+            setError(`Error: Failed to start video server. ${err}`);
+            return null;
+        }
+    }
+
+    useEffect(() => {
+        if (!videoPath) {
+            setError("Error: No video path found in store.");
+            return;
+        }
+
+        getVideoStreamUrl(videoPath).then((url) => {
+            if (url && videoRef.current) {
+                videoRef.current.src = url;
+                videoRef.current.load();
+            } else {
+                setError("Error: Could not generate video URL.");
+            }
+        });
+    }, [videoPath]);
+
+    const handleVideoLoaded = () => {
+        if (videoRef.current) {
+            setDuration(videoRef.current.duration);
+        }
+    };
+
     const handleTimeUpdate = () => {
         if (videoRef.current) {
-            const time = videoRef.current.currentTime
-            setCurrentTime(time)
-            onTimeUpdate?.(time)
+            setCurrentTime(videoRef.current.currentTime);
+            if (onTimeUpdate) onTimeUpdate(videoRef.current.currentTime);
         }
-    }
+    };
 
-    // Toggle Play/Pause
     const togglePlay = () => {
+        if (!videoRef.current) return;
+
+        if (videoRef.current.paused) {
+            videoRef.current.play().then(() => setIsPlaying(true)).catch(() => setError("Failed to play video."));
+        } else {
+            videoRef.current.pause();
+            setIsPlaying(false);
+        }
+    };
+
+    const handleProgressChange = (value: number) => {
         if (videoRef.current) {
-            if (isPlaying) {
-                videoRef.current.pause()
-            } else {
-                videoRef.current.play()
-            }
-            setIsPlaying(!isPlaying)
+            videoRef.current.currentTime = value;
+            setCurrentTime(value);
         }
-    }
+    };
 
-    // Seek video position
-    const seekTo = (time: number) => {
-        if (videoRef.current && metadata) {
-            const clampedTime = Math.min(Math.max(time, 0), metadata.duration)
-            videoRef.current.currentTime = clampedTime
-            setCurrentTime(clampedTime)
-        }
-    }
-
-    // Toggle Mute
     const toggleMute = () => {
         if (videoRef.current) {
-            videoRef.current.muted = !isMuted
-            setIsMuted(!isMuted)
+            videoRef.current.muted = !videoRef.current.muted;
+            setIsMuted(videoRef.current.muted);
         }
-    }
+    };
 
-    // Format time for UI display
-    const formatTime = (timeInSeconds: number): string => {
-        const minutes = Math.floor(timeInSeconds / 60)
-        const seconds = Math.floor(timeInSeconds % 60)
-        return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`
-    }
+    const handleVolumeChange = (value: number) => {
+        if (videoRef.current) {
+            videoRef.current.volume = value;
+            setVolume(value);
+            setIsMuted(value === 0);
+        }
+    };
+
+    const handleSpeedChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+        const newSpeed = parseFloat(event.target.value);
+        setPlaybackSpeed(newSpeed);
+        if (videoRef.current) {
+            videoRef.current.playbackRate = newSpeed;
+        }
+    };
 
     return (
-        <div className="video-player w-full bg-gray-900 rounded-lg overflow-hidden">
-            {/* Video Element (No Default Controls) */}
-            
+        <div
+            className="relative w-full bg-gray-900 rounded-lg overflow-hidden"
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+        >
+            {error && <div className="bg-red-500 text-white p-2 text-sm">{error}</div>}
+
             <video
-            src={videoPath!}
                 ref={videoRef}
-                className="w-full max-h-[500px] object-contain"
+                className="w-full max-h-[500px] object-contain bg-black"
+                playsInline
+                onLoadedData={handleVideoLoaded}
                 onTimeUpdate={handleTimeUpdate}
-                onPlay={() => setIsPlaying(true)}
-                onPause={() => setIsPlaying(false)}
-                onEnded={() => setIsPlaying(false)}
+                onClick={togglePlay}
             />
 
-
-            {/* Custom Controls */}
-            <div className="controls bg-gray-800 p-4 flex flex-col space-y-3">
-                {/* Play/Pause & Seek Slider in Same Row */}
-                <div className="flex items-center space-x-4">
-                    {/* Play/Pause Button */}
-                    <Button size="icon" variant="ghost" onClick={togglePlay} className="text-white hover:text-blue-400">
-                        {isPlaying ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6" />}
-                    </Button>
-
-                    {/* Seek Slider */}
-                    <Slider
-                        value={[currentTime]}
-                        max={metadata?.duration || 100}
-                        step={0.1}
-                        onValueChange={(value) => seekTo(value[0])}
-                        className="flex-1"
-                    />
-
-                    {/* Time Display */}
-                    <span className="text-white text-sm w-16 text-right">
-                        {formatTime(currentTime)}/{metadata ? formatTime(metadata.duration) : "00:00"}
-                    </span>
+            {/* Controls Container (Appears on Hover) */}
+            <div
+                className={`absolute inset-x-0 bottom-0 bg-gray-800 bg-opacity-90 p-3 transition-opacity ${isHovered ? "opacity-100" : "opacity-0"} duration-300`}
+            >
+                <div className="flex items-center mb-2">
+                    <span className="text-white text-xs mr-2">{Math.floor(currentTime / 60)}:{("0" + Math.floor(currentTime % 60)).slice(-2)}</span>
+                    <ProgressSlider value={currentTime} max={duration || 100} onChange={handleProgressChange} />
+                    <span className="text-white text-xs ml-2">{Math.floor(duration / 60)}:{("0" + Math.floor(duration % 60)).slice(-2)}</span>
                 </div>
 
-                {/* Volume Controls */}
-                <div className="flex items-center space-x-2">
-                    <Button size="icon" variant="ghost" onClick={toggleMute} className="text-white hover:text-blue-400">
-                        {isMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
-                    </Button>
-
-                    <Slider
-                        value={[volume * 100]}
-                        max={100}
-                        step={1}
-                        onValueChange={(value) => {
-                            const newVolume = value[0] / 100
-                            setVolume(newVolume)
-                            if (videoRef.current) {
-                                videoRef.current.volume = newVolume
-                            }
-                        }}
-                        className="w-24"
-                    />
-                </div>
-                
-            </div>
-            
+                <div className="flex justify-between items-center">
+    <div className="flex space-x-2 items-center">
+        <IconButton onClick={togglePlay}>
+            {isPlaying ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6" />}
+        </IconButton>
+        
+        <div className="flex items-center space-x-2">
+            <IconButton onClick={toggleMute}>
+                {isMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
+            </IconButton>
+            <VolumeSlider value={isMuted ? 0 : volume} onChange={handleVolumeChange} />
         </div>
-    )
-}
+    </div>
 
-export default VideoPlayer
+    <div className="flex items-center">
+        <label className="text-white text-sm">Speed:</label>
+        <select 
+            value={playbackSpeed} 
+            onChange={handleSpeedChange} 
+            className="ml-2 p-1 rounded bg-gray-700 text-white"
+        >
+            <option value="0.5">0.5x</option>
+            <option value="1">1x</option>
+            <option value="1.5">1.5x</option>
+            <option value="2">2x</option>
+            <option value="16">16x</option>
+        </select>
+    </div>
+</div>
+
+            </div>
+        </div>
+    );
+};
+
+export default VideoPlayer;
