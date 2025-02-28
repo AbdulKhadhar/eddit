@@ -23,22 +23,24 @@ jobs:
           git lfs install
           git lfs pull  # Fetch large files like ffmpeg.exe, ffprobe.exe
 
-      - name: Setup Node.js and pnpm
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22.14.0'
-          cache: 'pnpm'
 
-      - name: Install pnpm
+      - name: Install pnpm  # Install pnpm BEFORE caching dependencies
         run: npm install -g pnpm
 
       - name: Restore pnpm Cache
         uses: actions/cache@v4
         with:
           path: ~/.pnpm-store
-          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          key: pnpm-${{ runner.os }}-node-${{ steps.node.outputs.version }}-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             pnpm-${{ runner.os }}-
+
+      - name: Install Dependencies
+        run: pnpm install
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -53,15 +55,13 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             src-tauri/target
+            ~/.rustup  # Added Rust toolchain cache
           key: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             rust-${{ runner.os }}-
 
-      - name: Install Tauri Dependencies
-        run: pnpm install
-
       - name: Build Windows Executables (msi & exe)
-        run: pnpm tauri build --ci
+        run: pnpm tauri build --ci --release --jobs auto
         env:
           RUSTFLAGS: "-C target-cpu=native"  # Optimize for runner CPU
           CARGO_INCREMENTAL: "1"  # Enable incremental builds

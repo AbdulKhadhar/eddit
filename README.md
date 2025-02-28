@@ -2,7 +2,7 @@
 *A simple editing tool for cutting, compressing, and processing visuals.*  
 
 <p align="center">
-  <img src="app-icon.png" alt="Eddit Icon" width="120">
+  <img src="app-icon.png" alt="Eddit Icon" width="100">
 </p>
 
 ![Build Status](https://github.com/AbdulKhadhar/eddit/actions/workflows/build.yaml/badge.svg)
