@@ -1,14 +1,15 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod commands;
-mod video;
 mod utils;
+mod video;
+use commands::file::{select_directory, select_file};
+use commands::video::{
+    add_intro, add_intro_with_progress, compress_video, cut_video, cut_video_with_progress,
+    get_video_metadata, load_video, save_video,
+};
 use std::collections::HashMap;
 use tauri::command;
-use commands::video::{
-    load_video, cut_video, add_intro, compress_video, save_video, get_video_metadata,
-};
-use commands::file::{select_file, select_directory};
 use utils::{get_ffmpeg_path, get_ffprobe_path};
 
 use axum::{
@@ -35,9 +36,9 @@ async fn start_video_server(port: u16) -> Result<String, String> {
     if SERVER_RUNNING.load(Ordering::SeqCst) {
         return Ok(format!("http://127.0.0.1:{}", port));
     }
-    
+
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
-    
+
     // Try to bind to the port
     let listener = match TcpListener::bind(&addr).await {
         Ok(listener) => listener,
@@ -50,34 +51,34 @@ async fn start_video_server(port: u16) -> Result<String, String> {
             return Err(format!("Failed to bind to port {}: {}", port, e));
         }
     };
-    
+
     // Create a new Axum router
-    let app = Router::new()
-        .route("/video/{path}", get(serve_video));
-    
+    let app = Router::new().route("/video/{path}", get(serve_video));
+
     // Spawn the server on a background task
     tauri::async_runtime::spawn(async move {
         SERVER_RUNNING.store(true, Ordering::SeqCst);
         axum::serve(listener, app).await.unwrap();
     });
-    
+
     Ok(format!("http://127.0.0.1:{}", port))
 }
-
 
 async fn serve_video(Path(path): Path<String>) -> Result<Response<axum::body::Body>, StatusCode> {
     // Decode the path
     let path = urlencoding::decode(&path).map_err(|_| StatusCode::BAD_REQUEST)?;
     let path = PathBuf::from(path.into_owned());
-   
+
     // Check if file exists
     if !path.exists() {
         return Err(StatusCode::NOT_FOUND);
     }
-   
+
     // Read the file as bytes, not as a string
-    let content = tokio::fs::read(&path).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-   
+    let content = tokio::fs::read(&path)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
     // Determine MIME type based on extension
     let mime_type = match path.extension().and_then(|ext| ext.to_str()) {
         Some("mp4") => "video/mp4",
@@ -85,14 +86,14 @@ async fn serve_video(Path(path): Path<String>) -> Result<Response<axum::body::Bo
         Some("webm") => "video/webm",
         _ => "application/octet-stream",
     };
-   
+
     // Build response with binary body
     let response = Response::builder()
         .status(StatusCode::OK)
         .header(header::CONTENT_TYPE, mime_type)
         .body(axum::body::Body::from(content))
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-   
+
     Ok(response)
 }
 
@@ -104,11 +105,39 @@ fn check_dependencies() -> Result<HashMap<String, String>, String> {
     let ffmpeg_path = get_ffmpeg_path();
     let ffprobe_path = get_ffprobe_path();
 
-    // Check if the files exist and are executable
-    let ffmpeg_exists = ffmpeg_path.exists()
-        && std::process::Command::new(&ffmpeg_path).arg("-version").output().is_ok();
-    let ffprobe_exists = ffprobe_path.exists()
-        && std::process::Command::new(&ffprobe_path).arg("-version").output().is_ok();
+    // Function to check if a command runs successfully without showing a window
+    #[cfg(target_os = "windows")]
+    fn check_command_hidden(path: &PathBuf) -> bool {
+        use std::{os::windows::process::CommandExt, process::{Command, Stdio}};
+
+        path.exists()
+            && Command::new(path)
+                .arg("-version")
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .creation_flags(0x08000000) // Prevents window from appearing
+                .spawn()
+                .map(|mut child| child.wait().is_ok())
+                .unwrap_or(false)
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    fn check_command_hidden(path: &PathBuf) -> bool {
+        path.exists()
+            && Command::new(path)
+                .arg("-version")
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn()
+                .map(|mut child| child.wait().is_ok())
+                .unwrap_or(false)
+    }
+
+    // Check if ffmpeg and ffprobe exist and are executable
+    let ffmpeg_exists = check_command_hidden(&ffmpeg_path);
+    let ffprobe_exists = check_command_hidden(&ffprobe_path);
 
     // Store results in HashMap
     dependencies.insert(
@@ -139,7 +168,9 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             load_video,
             cut_video,
+            cut_video_with_progress,
             add_intro,
+            add_intro_with_progress,
             compress_video,
             save_video,
             get_video_metadata,

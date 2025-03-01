@@ -42,8 +42,10 @@ const SegmentEditor: React.FC<SegmentEditorProps> = ({ segment }) => {
 
   return (
     <div className="segment-editor bg-gray-800 border border-gray-700 rounded-lg p-4 mb-4 shadow-md">
+
       {/* Header and duration */}
       <div className="flex justify-between items-center mb-3">
+      
         <h3 className="text-lg font-semibold text-gray-100">
           {isEditing ? (
             <input
@@ -54,8 +56,14 @@ const SegmentEditor: React.FC<SegmentEditorProps> = ({ segment }) => {
               placeholder="Segment name"
             />
           ) : (
+            
             segment.output_name || "Unnamed Segment"
           )}
+          {segment.intro_path && (
+    <div className="right-2 bg-blue-500 text-white text-xs font-semibold px-2 py-1 rounded">
+      Intro Selected
+    </div>
+  )}
         </h3>
         <div className="flex items-center space-x-2">
           <span className="text-sm text-gray-400">Duration: {formatTimeDetailed(duration)}</span>

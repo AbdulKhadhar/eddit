@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Folder, Download, RefreshCw, XCircle, AlertTriangle } from "lucide-react"
+import { SegmentProgress } from "@/types"
 
 
 const VideoEditPage: React.FC = () => {
@@ -32,6 +33,11 @@ const VideoEditPage: React.FC = () => {
     const [currentStep, setCurrentStep] = useState<"select" | "edit" | "process">("select")
     const [error, setError] = useState<string | null>(null)
     const [isDragging] = useState(false)
+    const [progress, setProgress] = useState<SegmentProgress | null>(null)
+    const [elapsedTime, setElapsedTime] = useState(0);
+    const [timer, setTimer] = useState<NodeJS.Timeout | null>(null);
+
+
 
     const handleSelectVideo = async () => {
         try {
@@ -82,6 +88,15 @@ const VideoEditPage: React.FC = () => {
 
         setProcessingState(true)
         setError(null)
+        setProgress(null) // Reset progress
+        setElapsedTime(0);
+
+        // Start Timer
+        if (timer) clearInterval(timer); // Clear previous timer if exists
+        const newTimer = setInterval(() => {
+            setElapsedTime((prev) => prev + 1);
+        }, 1000);
+        setTimer(newTimer);
 
         try {
             const { ffmpeg } = await checkDependencies()
@@ -92,13 +107,17 @@ const VideoEditPage: React.FC = () => {
                 return
             }
 
-            const results = await cutVideo(videoPath, segments, outputDirectory)
+            const results = await cutVideo(videoPath, segments, outputDirectory, (progressData) => {
+                setProgress(progressData) // Update UI with progress
+            })
+
             setProcessingResults(results)
             setCurrentStep("process")
         } catch (error) {
-            setError("Error processing videos.")
+            setError(`Error processing videos: ${error}`)
         } finally {
             setProcessingState(false)
+            clearInterval(newTimer);
         }
     }
 
@@ -106,14 +125,18 @@ const VideoEditPage: React.FC = () => {
         resetStore()
         setCurrentStep("select")
         setError(null)
+        setProgress(null)
     }
 
     const handleCancelUpload = () => {
         resetStore()
         setCurrentStep("select")
+        setProgress(null)
+        setElapsedTime(0); // Reset elapsed time
+        if (timer) clearInterval(timer); // Stop timer if running
     }
 
-    
+
 
 
     return (
@@ -125,24 +148,26 @@ const VideoEditPage: React.FC = () => {
                 </div>
             )}
 
-            
-                {currentStep === "select" && (
-                    <div
+
+
+
+
+            {currentStep === "select" && (
+                <div
                     className="flex items-center justify-center w-full bg-gray-900"
-                    
+
                 >
                     <div
-                        className={`bg-gray-800 rounded-lg shadow-xl p-6 min-h-[400px] w-[90%] max-w-lg flex flex-col items-center justify-center border-2 ${
-                            isDragging ? "border-blue-500 border-dashed" : "border-gray-700"
-                        } transition-all duration-200`}
+                        className={`bg-gray-800 rounded-lg shadow-xl p-6 min-h-[400px] w-[90%] max-w-lg flex flex-col items-center justify-center border-2 ${isDragging ? "border-blue-500 border-dashed" : "border-gray-700"
+                            } transition-all duration-200`}
                     >
                         <img src="app-icon.png" alt="Eddit Icon" className="w-16 h-16 mb-4" />
-        
+
                         <h2 className="text-3xl font-bold text-gray-100 mb-4">Let's Start</h2>
                         <p className="text-gray-400 max-w-md text-center mb-6">
-                            Click to select a video. 
+                            Click to select a video.
                         </p>
-        
+
                         <button
                             onClick={() => handleSelectVideo()}
                             className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium text-lg flex items-center space-x-2 transition-all duration-200 transform hover:scale-105"
@@ -165,10 +190,10 @@ const VideoEditPage: React.FC = () => {
                         </button>
                     </div>
                 </div>
-                )}
+            )}
 
-                {currentStep === "edit" && (
-                    <div className="bg-gray-800 rounded-lg shadow-xl p-6 min-h-[600px]">
+            {currentStep === "edit" && (
+                <div className="bg-gray-800 rounded-lg shadow-xl p-6 min-h-[600px]">
                     <div className="flex h-full space-x-4">
                         <div className="flex-1 bg-gray-900 p-4 rounded-lg">
                             {videoPath && (
@@ -176,23 +201,56 @@ const VideoEditPage: React.FC = () => {
                                     <div className="aspect-video bg-black rounded-lg overflow-hidden mb-4">
                                         <VideoPlayer onTimeUpdate={setCurrentTime} />
                                     </div>
+
                                     <Timeline currentTime={currentTime} onSeek={setCurrentTime} />
 
-                                    <ScrollArea className="h-40 bg-gray-800 p-3 rounded-lg">
+                                    <ScrollArea className="h-50 bg-gray-800 p-3 rounded-lg">
                                         {segments.length > 0 ? (
-                                            segments.map((segment) => <SegmentEditor key={segment.id} segment={segment} />)
+                                            segments.map((segment) => (
+                                                <SegmentEditor key={segment.id} segment={segment} />
+                                            ))
                                         ) : (
                                             <p className="text-gray-500">No segments created yet.</p>
                                         )}
                                     </ScrollArea>
 
-                                    <Button onClick={handleCancelUpload} className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center">
-                                        <XCircle className="w-5 h-5 mr-2" />
-                                        Cancel Upload
-                                    </Button>
+                                    {/* Cancel Button and Progress Bar in the same row */}
+                                    <div className="flex items-center gap-4 mt-4">
+                                        <Button
+                                            onClick={handleCancelUpload}
+                                            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center"
+                                        >
+                                            <XCircle className="w-5 h-5 mr-2" />
+                                            Cancel Upload
+                                        </Button>
+
+                                        {progress && (
+                                            <div className="flex flex-col bg-gray-800 p-2 rounded-md w-full">
+                                                <div className="flex justify-between items-center mb-1">
+                                                    <p className="text-gray-300 text-sm">
+                                                        Processing Segment {progress.index + 1} of {progress.total} ({progress.status})
+                                                    </p>
+                                                    <p className="text-gray-400 text-sm font-semibold">
+                                                        ⏳ {elapsedTime}s
+                                                    </p>
+                                                </div>
+
+                                                {/* Progress Bar (Full Width) */}
+                                                <div className="w-full bg-gray-600 rounded-full h-2.5">
+                                                    <div
+                                                        className="bg-blue-500 h-2.5 rounded-full transition-all duration-300"
+                                                        style={{
+                                                            width: `${((progress.index + progress.progress / 100) / progress.total) * 100}%`
+                                                        }}
+                                                    ></div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                 </>
                             )}
                         </div>
+
 
                         <div className="w-1/3 bg-gray-800 p-4 rounded-lg flex flex-col space-y-6">
                             <h3 className="text-lg font-semibold text-gray-300 mb-2">Settings</h3>
@@ -206,7 +264,6 @@ const VideoEditPage: React.FC = () => {
                                 </Button>
                             </div>
 
-                            {/* Process Button */}
                             <div className="mt-auto">
                                 <Button
                                     onClick={handleProcessVideos}
@@ -225,14 +282,16 @@ const VideoEditPage: React.FC = () => {
                                         </>
                                     )}
                                 </Button>
+
                             </div>
                         </div>
                     </div>
-                    </div>
-                )}
+                </div>
+            )}
 
-                {currentStep === "process" && (
-                    <div className="bg-gray-800 rounded-lg shadow-xl p-6 min-h-[600px]">
+
+            {currentStep === "process" && (
+                <div className="bg-gray-800 rounded-lg shadow-xl p-6 min-h-[600px]">
                     <div className="bg-gray-800 rounded-lg p-6">
                         <h2 className="text-2xl font-bold text-gray-100 mb-6">Processing Results</h2>
                         <div className="space-y-6 mb-8">
@@ -293,14 +352,14 @@ const VideoEditPage: React.FC = () => {
                             </Button>
                         </div>
                     </div>
-                    </div>
-                )}
+                </div>
+            )}
 
-            </div>
+        </div>
 
 
 
-        
+
     )
 }
 

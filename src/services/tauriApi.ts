@@ -1,5 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
-import { VideoSegment, VideoMetadata, CompressionSettings, ProcessingResult } from '../types';
+import { VideoSegment, VideoMetadata, CompressionSettings, ProcessingResult, SegmentProgress } from '../types';
+import { getCurrentWindow } from '@tauri-apps/api/window';
+import { listen } from '@tauri-apps/api/event';
 
 export async function loadVideo(path: string): Promise<VideoMetadata> {
   try {
@@ -22,17 +24,27 @@ export async function getVideoMetadata(path: string): Promise<VideoMetadata> {
 export async function cutVideo(
   inputPath: string,
   segments: VideoSegment[],
-  outputDir: string
+  outputDir: string,
+  onProgress: (progress: SegmentProgress) => void
 ): Promise<ProcessingResult[]> {
   try {
-    return await invoke<ProcessingResult[]>('cut_video', {
+    // Listen for progress updates from Rust
+    const unlisten = await listen("segment_progress", (event) => {
+      const progressData = event.payload as SegmentProgress
+      onProgress(progressData) // Call the progress callback
+    })
+
+    const result = await invoke<ProcessingResult[]>("cut_video_with_progress", {
       inputPath,
       segments,
       outputDir
-    });
+    })
+
+    unlisten() // Stop listening when processing is complete
+    return result
   } catch (error) {
-    console.error("Error cutting video:", error);
-    throw error;
+    console.error("Error cutting video:", error)
+    throw error
   }
 }
 
@@ -114,3 +126,23 @@ export async function checkDependencies(): Promise<{ffmpeg: boolean}> {
     return { ffmpeg: false };
   }
 }
+
+export const addIntroWithProgress = async (
+  introPath: string,
+  videoPath: string,
+  outputDir: string,
+  compressionSettings?: {
+    quality: number;
+    preset: string;
+    codec: string;
+  }
+) => {
+  const appWindow = getCurrentWindow();
+  return invoke('add_intro_with_progress', {
+    introPath,
+    videoPath,
+    outputDir,
+    settings: compressionSettings,
+    window: appWindow
+  });
+};
