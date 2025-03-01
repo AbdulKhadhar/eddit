@@ -1,94 +1,144 @@
-# **Eddit 🎬**  
-*A simple editing tool for cutting, compressing, and processing visuals.*  
+# Eddit 🎬
 
 <p align="center">
-  <img src="app-icon.png" alt="Eddit Icon" width="100">
+  <img src="app-icon.png" alt="Eddit Icon" width="120">
 </p>
 
-![Build Status](https://github.com/AbdulKhadhar/eddit/actions/workflows/build.yaml/badge.svg)
+<p align="center">
+  <strong>A powerful video editing tool for cutting, compressing, and processing visuals</strong>
+</p>
 
-## 🚀 Download Latest Version
+<p align="center">
+  <a href="#features">Features</a> •
+  <a href="#installation">Installation</a> •
+  <a href="#usage">Usage</a> •
+  <a href="#development">Development</a> •
+  <a href="#contributing">Contributing</a> •
+  <a href="#license">License</a>
+</p>
 
-| Platform | Installer |
-|----------|------------|
-| 🖥️ Windows (.msi) | [Download](https://github.com/AbdulKhadhar/eddit/releases/latest/download/eddit_0.1.0_x64_en-US.msi) |
-| 🖥️ Windows (.exe) | [Download](https://github.com/AbdulKhadhar/eddit/releases/latest/download/eddit_0.1.0_x64-setup.exe) |
+<p align="center">
+  <img src="https://github.com/AbdulKhadhar/eddit/actions/workflows/build.yaml/badge.svg" alt="Build Status">
+</p>
 
----
+<p align="center">
+  <img src="screenshot.png" alt="Eddit Application Screenshot" width="800">
+</p>
 
-## **✨ Features**  
-- 📌 **Cut videos** into multiple segments effortlessly.  
-- 🎭 **Add custom intro videos** to each segment.  
-- 🔥 **Compress videos** for optimized storage and sharing.  
-- 🚀 **Fast processing** powered by **FFmpeg**.  
-- 🎨 **Modern UI** with **Tailwind CSS 4**.  
-- 🖥 **Cross-platform support** with **Tauri**.  
+## 📥 Download Latest Version
 
----
+| Platform | Installer | Type |
+|----------|-----------|------|
+| Windows | [Download .msi](https://github.com/AbdulKhadhar/eddit/releases/latest/download/eddit_0.1.0_x64_en-US.msi) | Recommended for most users |
+| Windows | [Download .exe](https://github.com/AbdulKhadhar/eddit/releases/latest/download/eddit_0.1.0_x64-setup.exe) | Alternative installer |
 
-## **🛠 Tech Stack**  
-- **Frontend**: React (TypeScript) + Tailwind CSS 4  
-- **Backend**: Tauri (Rust)  
-- **Video Processing**: FFmpeg  
+## ✨ Features
 
----
+- **Video Cutting** - Segment videos with frame-accurate precision
+- **Custom Intro Addition** - Seamlessly add intro clips to each segment
+- **Video Compression** - Optimize file size while maintaining quality
+- **Batch Processing** - Handle multiple videos simultaneously
+- **Fast Performance** - Powered by FFmpeg for efficient processing
+- **Modern Interface** - Intuitive UI built with Tailwind CSS 4
+- **Cross-Platform** - Built with Tauri 2 for compatibility across systems
 
-## **🚀 Installation & Setup**  
+## 🖥️ Screenshot
 
-### **Prerequisites**  
-Make sure you have the following installed:  
-- [Node.js](https://nodejs.org/)  
-- [Rust & Cargo](https://www.rust-lang.org/tools/install)  
-- [FFmpeg](https://ffmpeg.org/download.html)  
+![Eddit Application Interface](screenshot.png)
 
-### **Clone the Repository**  
-```sh
-git clone https://github.com/yourusername/eddit.git
+## 🚀 Installation
+
+### For Users
+
+1. **Download** the installer for your platform from the links above
+2. **Run** the installer and follow the on-screen instructions
+3. **Launch** Eddit from your applications menu or desktop shortcut
+
+### For Developers
+
+#### Prerequisites
+
+- [Node.js](https://nodejs.org/) (v22.12.0 or latest stable)
+- [pnpm](https://pnpm.io/installation) (recommended package manager)
+- [Rust & Cargo](https://www.rust-lang.org/tools/install) (latest stable)
+- [Git](https://git-scm.com/downloads)
+
+#### Setup
+
+1. **Clone the repository**
+
+```bash
+git clone https://github.com/AbdulKhadhar/eddit.git
 cd eddit
 ```
 
-### **Install Dependencies**  
-```sh
-npm install
+2. **Unzip FFmpeg components**
+
+After cloning, you need to unzip FFmpeg components:
+- Unzip `src-tauri/bin/ffmpeg.zip` and `src-tauri/bin/ffprobe.zip` to the same folder (`src-tauri/bin/`)
+
+3. **Install dependencies**
+
+```bash
+pnpm install
 ```
 
-### **Run the App**
-```sh
-npm run tauri dev
+## 💻 Development
+
+### Running in Development Mode
+
+```bash
+pnpm tauri dev
 ```
 
-### **Build for Production**
-```sh
-npm run tauri build
+### Building for Production
+
+```bash
+pnpm tauri build
 ```
 
-## 🤝 Contributing  
-We welcome contributions from the community! 🎉  
+## 🛠️ Tech Stack
 
-To contribute:  
-1. **Fork** the repository  
-2. **Create a new branch** (`git checkout -b feature-xyz`)  
-3. **Commit your changes** (`git commit -m "Added feature xyz"`)  
-4. **Push to your branch** (`git push origin feature-xyz`)  
-5. **Open a Pull Request**  
+- **Frontend**: 
+  - React with TypeScript
+  - Tailwind CSS 4
+  - Vite
+  
+- **Backend**:
+  - Tauri 2 (Rust)
+  - FFmpeg for video processing
 
-Please follow the project's coding style and guidelines when submitting PRs.  
+## 🤝 Contributing
+
+Contributions are welcome and appreciated! Here's how you can contribute:
+
+1. **Fork** the repository
+2. **Create a branch** for your feature (`git checkout -b feature/amazing-feature`)
+3. **Commit** your changes (`git commit -m 'Add some amazing feature'`)
+4. **Push** to the branch (`git push origin feature/amazing-feature`)
+5. **Open a Pull Request**
+
+Please make sure to update tests as appropriate and adhere to the project's code style.
+
+## 📜 License
+
+This project is licensed under the [MIT License](LICENSE).
+
+## 🌟 Support
+
+If you find Eddit useful, please consider:
+- Giving it a star on GitHub
+- Sharing it with others who might benefit
+- Providing feedback through issues
+
+## 📬 Contact
+
+For issues, suggestions, or questions:
+- Open an [issue](https://github.com/AbdulKhadhar/eddit/issues) on GitHub
+- Connect on [LinkedIn](https://www.linkedin.com/in/abdul-khadar/)
 
 ---
 
-## 📜 License  
-This project is licensed under the [MIT License](LICENSE).  
-
----
-
-## Support  
-If you find this tool helpful, consider giving it a ⭐ on GitHub!  
-
----
-
-## 📬 Contact  
-For issues, suggestions, or questions, feel free to:  
-- Open an [issue](https://github.com/AbdulKhadhar/eddit/issues) on GitHub  
-- Reach out on [LinkedIn](https://www.linkedin.com/in/abdul-khadar/)  
-
-Happy editing! 🎬✨  
+<p align="center">
+  Made with ❤️ by <a href="https://github.com/AbdulKhadhar">Abdul Khadhar</a>
+</p>

@@ -29,3 +29,11 @@ export interface ProcessingResult {
   output_path?: string;
   error_message?: string;
 }
+
+export interface SegmentProgress {
+  index: number;      // Current segment index (starting from 0)
+  total: number;      // Total number of segments
+  status: string;     // Status of the process ("cutting", "adding_intro", etc.)
+  progress: number;   // Progress percentage (0 to 100)
+  estimated_time?: number; // Estimated time remaining (optional, in seconds)
+}

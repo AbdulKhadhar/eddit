@@ -1,11 +1,202 @@
-use std::process::Command;
-use std::fs::File;
-use std::io::Write;
+use tauri::{Emitter, Manager};
+use std::os::windows::process::CommandExt;
+use std::process::{Command, Stdio};
 use std::path::Path;
+use std::fs::File;
+use std::io::{BufReader, BufRead};
 use uuid::Uuid;
 use anyhow::{Result, anyhow};
-
+use std::sync::{Arc, Mutex};
+use std::thread;
+use crate::commands::video::CompressionSettings;
 use crate::utils::get_ffmpeg_path;
+
+pub async fn add_intro_with_progress(
+    intro_path: String, 
+    video_path: String, 
+    output_dir: String,
+    settings: Option<CompressionSettings>,
+    window: tauri::Window
+) -> Result<String, String> {
+    // Create a temporary file for progress output
+    let temp_dir = std::env::temp_dir();
+    let progress_file = temp_dir.join(format!("ffmpeg_progress_{}.txt", Uuid::new_v4()));
+    let progress_path = progress_file.to_str().unwrap().to_string();
+    
+    // Get durations to calculate total duration
+    let intro_duration = match crate::video::cutter::get_metadata(&intro_path) {
+        Ok(meta) => meta.duration,
+        Err(e) => return Err(format!("Failed to get intro metadata: {}", e))
+    };
+    
+    let video_duration = match crate::video::cutter::get_metadata(&video_path) {
+        Ok(meta) => meta.duration,
+        Err(e) => return Err(format!("Failed to get video metadata: {}", e))
+    };
+    
+    let total_duration = intro_duration + video_duration;
+    
+    // Create thread to monitor progress
+    let progress_path_clone = progress_path.clone();
+    let window_clone = window.clone();
+    
+    // Spawn a thread to monitor progress
+    let _monitor_handle = thread::spawn(move || {
+        let path = progress_path_clone;
+        
+        // Wait for the file to be created
+        while !Path::new(&path).exists() {
+            thread::sleep(std::time::Duration::from_millis(100));
+        }
+        
+        // Monitor the progress
+        loop {
+            if !Path::new(&path).exists() {
+                // File was deleted, process must be done
+                break;
+            }
+            
+            if let Ok(file) = File::open(&path) {
+                let reader = BufReader::new(file);
+                let mut current_time = 0.0;
+                
+                for line in reader.lines().flatten() {
+                    if line.starts_with("out_time_ms=") {
+                        if let Ok(time_ms) = line.trim_start_matches("out_time_ms=").parse::<f64>() {
+                            current_time = time_ms / 1_000_000.0;
+                        }
+                    }
+                }
+                
+                // Calculate progress (as a percentage between 0-100)
+                let progress = ((current_time / total_duration) * 100.0).min(100.0).max(0.0);
+                
+                // Emit event to frontend
+                let _ = window_clone.emit("intro_progress", progress);
+            }
+            
+            thread::sleep(std::time::Duration::from_millis(200));
+        }
+        
+        // Send 100% when done
+        let _ = window_clone.emit("intro_progress", 100.0);
+    });
+    
+    // Now run the ffmpeg process with the created progress file
+    let result = add_intro_internal(&intro_path, &video_path, &output_dir, settings, &progress_path).await;
+    
+    // Clean up progress file
+    let _ = std::fs::remove_file(progress_file);
+    
+    match result {
+        Ok(path) => Ok(path),
+        Err(e) => Err(format!("Failed to add intro: {}", e))
+    }
+}
+
+async fn add_intro_internal(
+    intro_path: &str, 
+    video_path: &str, 
+    output_dir: &str,
+    settings: Option<CompressionSettings>,
+    progress_file: &str
+) -> Result<String> {
+    let ffmpeg_path = get_ffmpeg_path();
+    
+    if !ffmpeg_path.exists() {
+        return Err(anyhow!("FFmpeg not found at {:?}", ffmpeg_path));
+    }
+    
+    // Extract filenames (without extensions) for better naming
+    let intro_filename = Path::new(intro_path)
+        .file_stem()
+        .unwrap_or_default()
+        .to_string_lossy();
+    
+    let video_filename = Path::new(video_path)
+        .file_stem()
+        .unwrap_or_default()
+        .to_string_lossy();
+    
+    // Generate a unique output filename with UUID
+    let unique_id = Uuid::new_v4();
+    let output_filename = format!("merged_{}_{}_{}.mp4", intro_filename, video_filename, unique_id);
+    let output_path = Path::new(output_dir).join(output_filename);
+    
+    // Create command with hidden window
+    #[cfg(target_os = "windows")]
+    let mut cmd = {
+        let mut command = Command::new(&ffmpeg_path);
+        command.creation_flags(0x08000000); // CREATE_NO_WINDOW flag
+        command
+    };
+    
+    #[cfg(not(target_os = "windows"))]
+    let mut cmd = Command::new(&ffmpeg_path);
+    
+    // Try with copy codec first
+    cmd.args(&[
+        "-i", intro_path,
+        "-i", video_path,
+        "-filter_complex", "[0:v:0][0:a:0][1:v:0][1:a:0] concat=n=2:v=1:a=1 [v][a]",
+        "-map", "[v]",
+        "-map", "[a]",
+        "-c:v", "copy",
+        "-c:a", "aac",
+        "-b:a", "192k",
+        "-progress", progress_file,
+        "-y",
+        output_path.to_str().unwrap()
+    ])
+    .stdin(Stdio::null())
+    .stdout(Stdio::null())
+    .stderr(Stdio::null());
+    
+    let status = cmd.status()?;
+    
+    // If copy failed, try with encoding using the quality settings
+    if !status.success() {
+        // Apply quality settings if provided
+        let preset = settings.as_ref().map_or("fast", |s| s.preset());
+        let crf = settings.as_ref().map_or(28, |s| s.quality()).to_string();
+        let codec = settings.as_ref().map_or("libx264", |s| s.codec());
+        
+        #[cfg(target_os = "windows")]
+        let mut cmd = {
+            let mut command = Command::new(&ffmpeg_path);
+            command.creation_flags(0x08000000); // CREATE_NO_WINDOW flag
+            command
+        };
+        
+        #[cfg(not(target_os = "windows"))]
+        let mut cmd = Command::new(&ffmpeg_path);
+        
+        cmd.args(&[
+            "-i", intro_path,
+            "-i", video_path,
+            "-filter_complex", "[0:v:0][0:a:0][1:v:0][1:a:0] concat=n=2:v=1:a=1 [v][a]",
+            "-map", "[v]",
+            "-map", "[a]",
+            "-c:v", codec,
+            "-preset", preset,
+            "-crf", &crf,
+            "-progress", progress_file,
+            "-y",
+            output_path.to_str().unwrap()
+        ])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+        
+        let status = cmd.status()?;
+        
+        if !status.success() {
+            return Err(anyhow!("FFmpeg failed to concatenate the videos"));
+        }
+    }
+    
+    Ok(output_path.to_str().unwrap().to_string())
+}
 
 pub fn add_intro(intro_path: &str, video_path: &str, output_dir: &str) -> Result<String> {
     let ffmpeg_path = get_ffmpeg_path();  
