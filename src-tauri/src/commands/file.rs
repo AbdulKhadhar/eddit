@@ -1,3 +1,7 @@
+// Copyright (c) 2025 Abdul Khadhar. All rights reserved.
+// This source code is licensed under the MIT license found in the
+// LICENSE file in the root directory of this source tree.
+
 use tauri::command;
 use tauri::{Runtime, Manager};
 use tauri_plugin_dialog::{Dialog, FileDialogBuilder, FilePath, DialogExt};
