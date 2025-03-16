@@ -13,7 +13,7 @@ import VideoPlayer from "../components/video/VideoPlayer"
 import Timeline from "../components/video/Timeline"
 import SegmentEditor from "../components/video/SegmentEditor"
 import CompressionSettings from "../components/video/CompressionSettings"
-import { loadVideo, selectFile, selectDirectory, cutVideo, checkDependencies } from "../services/tauriApi"
+import { loadVideo, selectFile, selectDirectory, processVideo, checkDependencies, cutVideo } from "../services/tauriApi"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -28,6 +28,7 @@ const VideoEditPage: React.FC = () => {
         outputDirectory,
         isProcessing,
         processingResults,
+        compressionSettings,
         setVideoPath,
         setMetadata,
         setOutputDirectory,
@@ -41,8 +42,9 @@ const VideoEditPage: React.FC = () => {
     const [error, setError] = useState<string | null>(null)
     const [isDragging] = useState(false)
     const [progress, setProgress] = useState<SegmentProgress | null>(null)
-    const [elapsedTime, setElapsedTime] = useState(0);
-    const [timer, setTimer] = useState<NodeJS.Timeout | null>(null);
+    const [elapsedTime, setElapsedTime] = useState(0)
+    const [timer, setTimer] = useState<NodeJS.Timeout | null>(null)
+    const [isCompressionEnabled, setIsCompressionEnabled] = useState(true); 
 
 
 
@@ -89,44 +91,79 @@ const VideoEditPage: React.FC = () => {
 
     const handleProcessVideos = async () => {
         if (!videoPath || !outputDirectory || segments.length === 0) {
-            setError("Please select a video, an output directory, and create segments before processing.")
-            return
+            setError("Please select a video, an output directory, and create segments before processing.");
+            return;
         }
-
-        setProcessingState(true)
-        setError(null)
-        setProgress(null) // Reset progress
+    
+        setProcessingState(true);
+        setError(null);
+        setProgress(null);
         setElapsedTime(0);
-
+    
         // Start Timer
-        if (timer) clearInterval(timer); // Clear previous timer if exists
+        if (timer) clearInterval(timer); 
         const newTimer = setInterval(() => {
             setElapsedTime((prev) => prev + 1);
         }, 1000);
         setTimer(newTimer);
-
+    
         try {
-            const { ffmpeg } = await checkDependencies()
-
+            const { ffmpeg } = await checkDependencies();
+    
             if (!ffmpeg) {
-                setError("⚠ FFmpeg is missing! Please install FFmpeg and add it to your system PATH.")
-                setProcessingState(false)
-                return
+                setError("⚠ FFmpeg is missing! Please install FFmpeg and add it to your system PATH.");
+                setProcessingState(false);
+                return;
             }
-
-            const results = await cutVideo(videoPath, segments, outputDirectory, (progressData) => {
-                setProgress(progressData) // Update UI with progress
-            })
-
-            setProcessingResults(results)
-            setCurrentStep("process")
+    
+            let results;
+    
+            if (isCompressionEnabled) {
+                results = await processVideo(
+                    videoPath,
+                    segments,
+                    outputDirectory,
+                    compressionSettings, // Compression settings required
+                    (progressData: React.SetStateAction<SegmentProgress | null>) => {
+                        setProgress(progressData);
+                    }
+                );
+            } else {
+                results = await cutVideo(
+                    videoPath,
+                    segments,
+                    outputDirectory,
+                    (progressData: React.SetStateAction<SegmentProgress | null>) => {
+                        setProgress(progressData);
+                    }
+                );
+            }
+    
+            setProcessingResults(results);
+            setCurrentStep("process");
         } catch (error) {
-            setError(`Error processing videos: ${error}`)
+            setError(`Error processing videos: ${error}`);
         } finally {
-            setProcessingState(false)
+            setProcessingState(false);
             clearInterval(newTimer);
         }
-    }
+    };
+    
+
+    const formatTime = (seconds: number) => {
+        const hrs = Math.floor(seconds / 3600);
+        const mins = Math.floor((seconds % 3600) / 60);
+        const secs = (seconds % 60).toFixed(2);
+    
+        if (hrs > 0) {
+            return `${hrs}h ${mins}m ${secs}s`;
+        } else if (mins > 0) {
+            return `${mins}m ${secs}s`;
+        } else {
+            return `${secs}s`;
+        }
+    };
+    
 
     const handleStartOver = () => {
         resetStore()
@@ -238,7 +275,7 @@ const VideoEditPage: React.FC = () => {
                                                         Processing Segment {progress.index + 1} of {progress.total} ({progress.status})
                                                     </p>
                                                     <p className="text-gray-400 text-sm font-semibold">
-                                                        ⏳ {elapsedTime}s
+                                                        ⏳ {formatTime(elapsedTime)}
                                                     </p>
                                                 </div>
 
@@ -261,7 +298,25 @@ const VideoEditPage: React.FC = () => {
 
                         <div className="w-1/3 bg-gray-800 p-4 rounded-lg flex flex-col space-y-6">
                             <h3 className="text-lg font-semibold text-gray-300 mb-2">Settings</h3>
-                            <CompressionSettings />
+                            {/* ✅ Toggle for Compression */}
+                    <div className="flex items-center justify-between">
+                        <label className="text-gray-300">Enable Compression</label>
+                        <button
+                            onClick={() => setIsCompressionEnabled((prev) => !prev)}
+                            className={`w-12 h-6 flex items-center bg-gray-600 rounded-full p-1 transition ${
+                                isCompressionEnabled ? "bg-green-500" : "bg-gray-500"
+                            }`}
+                        >
+                            <div
+                                className={`w-4 h-4 bg-white rounded-full shadow-md transform transition ${
+                                    isCompressionEnabled ? "translate-x-6" : "translate-x-0"
+                                }`}
+                            ></div>
+                        </button>
+                    </div>
+
+                    {/* ✅ Show Compression Settings only if enabled */}
+                    {isCompressionEnabled && <CompressionSettings />}
 
                             <h3 className="text-lg font-semibold text-gray-300 mb-2">Output Directory</h3>
                             <div className="flex items-center">
@@ -302,51 +357,63 @@ const VideoEditPage: React.FC = () => {
                     <div className="bg-gray-800 rounded-lg p-6">
                         <h2 className="text-2xl font-bold text-gray-100 mb-6">Processing Results</h2>
                         <div className="space-y-6 mb-8">
-                            {processingResults.map((result, index) => (
-                                <div
-                                    key={index}
-                                    className={`p-4 rounded-lg ${result.success ? "bg-green-900 border border-green-700" : "bg-red-900 border border-red-700"}`}
-                                >
-                                    <div className="flex items-start">
-                                        {result.success ? (
-                                            <div className="flex-shrink-0 bg-green-700 rounded-full p-2 mr-4">
-                                                <svg className="w-6 h-6 text-green-100" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
-                                                </svg>
-                                            </div>
-                                        ) : (
-                                            <div className="flex-shrink-0 bg-red-700 rounded-full p-2 mr-4">
-                                                <svg className="w-6 h-6 text-red-100" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
-                                                </svg>
-                                            </div>
-                                        )}
+                        {processingResults.map((result, index) => {
+    // Extract segment duration
+    const segment = segments[index]; 
+    const segmentDuration = segment ? segment.end_time - segment.start_time : null;
+    
+    return (
+        <div
+            key={index}
+            className={`p-4 rounded-lg ${result.success ? "bg-green-900 border border-green-700" : "bg-red-900 border border-red-700"}`}
+        >
+            <div className="flex items-start">
+                {result.success ? (
+                    <div className="flex-shrink-0 bg-green-700 rounded-full p-2 mr-4">
+                        <svg className="w-6 h-6 text-green-100" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                    </div>
+                ) : (
+                    <div className="flex-shrink-0 bg-red-700 rounded-full p-2 mr-4">
+                        <svg className="w-6 h-6 text-red-100" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </div>
+                )}
 
-                                        <div>
-                                            <h3 className="text-lg font-semibold mb-2">
-                                                {result.success ? (
-                                                    <span className="text-green-100">Segment {index + 1} Successfully Processed</span>
-                                                ) : (
-                                                    <span className="text-red-100">Segment {index + 1} Failed to Process</span>
-                                                )}
-                                            </h3>
+                <div>
+                    <h3 className="text-lg font-semibold mb-2">
+                        {result.success ? (
+                            <span className="text-green-100">Segment {index + 1} Successfully Processed</span>
+                        ) : (
+                            <span className="text-red-100">Segment {index + 1} Failed to Process</span>
+                        )}
+                    </h3>
 
-                                            {result.output_path && (
-                                                <div className="mt-2 flex items-center">
-                                                    <Folder className="w-4 h-4 text-gray-400 mr-2" />
-                                                    <p className="text-sm text-gray-300 font-mono truncate max-w-lg">{result.output_path}</p>
-                                                </div>
-                                            )}
+                    {segmentDuration !== null && (
+                        <p className="text-gray-300 text-sm">
+                            ⏱ Duration: {formatTime(segmentDuration)}
+                        </p>
+                    )}
 
-                                            {!result.success && result.error_message && (
-                                                <div className="mt-3 bg-red-800 p-3 rounded-md">
-                                                    <p className="text-sm text-red-100 font-mono">{result.error_message}</p>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
+                    {result.output_path && (
+                        <div className="mt-2 flex items-center">
+                            <Folder className="w-4 h-4 text-gray-400 mr-2" />
+                            <p className="text-sm text-gray-300 font-mono truncate max-w-lg">{result.output_path}</p>
+                        </div>
+                    )}
+
+                    {!result.success && result.error_message && (
+                        <div className="mt-3 bg-red-800 p-3 rounded-md">
+                            <p className="text-sm text-red-100 font-mono">{result.error_message}</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+})}
                         </div>
 
                         <div className="flex justify-center">
