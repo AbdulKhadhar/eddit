@@ -146,3 +146,34 @@ export const addIntroWithProgress = async (
     window: appWindow
   });
 };
+
+
+export async function processVideo(
+  inputPath: string,
+  segments: VideoSegment[],
+  outputDir: string,
+  compressionSettings: CompressionSettings,
+  onProgress: (progress: SegmentProgress) => void
+): Promise<ProcessingResult[]> {
+  try {
+    // Listen for progress updates from Rust
+    const unlisten = await listen("segment_progress", (event) => {
+      const progressData = event.payload as SegmentProgress
+      onProgress(progressData) // Call the progress callback
+    })
+
+    // Invoke the new Rust function with compression settings
+    const result = await invoke<ProcessingResult[]>("process_video_with_progress", {
+      inputPath,
+      segments,
+      outputDir,
+      compressionSettings, // Passing compression settings
+    })
+
+    unlisten() // Stop listening when processing is complete
+    return result
+  } catch (error) {
+    console.error("Error processing video:", error)
+    throw error
+  }
+}

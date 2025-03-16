@@ -9,8 +9,7 @@ mod utils;
 mod video;
 use commands::file::{select_directory, select_file};
 use commands::video::{
-    add_intro, add_intro_with_progress, compress_video, cut_video, cut_video_with_progress,
-    get_video_metadata, load_video, save_video,
+    add_intro, add_intro_with_progress, compress_video, cut_video, cut_video_with_progress, get_video_metadata, load_video, process_video_with_progress, save_video
 };
 use std::collections::HashMap;
 use tauri::command;
@@ -171,8 +170,8 @@ fn main() {
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
             load_video,
-            cut_video,
             cut_video_with_progress,
+            process_video_with_progress,
             add_intro,
             add_intro_with_progress,
             compress_video,

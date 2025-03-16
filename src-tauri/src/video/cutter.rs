@@ -89,26 +89,35 @@ pub fn cut_segment(
     start_time: f64,
     end_time: f64,
     output_dir: &str,
-    output_name: &str
+    output_name: &str,
 ) -> Result<String> {
     let ffmpeg_path = get_ffmpeg_path();
 
-    let output_path = Path::new(output_dir)
-        .join(format!("{}.mp4", output_name));
+    if !ffmpeg_path.exists() {
+        return Err(anyhow!("FFmpeg not found at {:?}", ffmpeg_path));
+    }
 
     let duration = end_time - start_time;
+    
+    // Ensure unique filename
+    let mut output_path = Path::new(output_dir).join(format!("{}_segment.mp4", output_name));
+    let mut counter = 1;
+    while output_path.exists() {
+        output_path = Path::new(output_dir).join(format!("{}_segment_{}.mp4", output_name, counter));
+        counter += 1;
+    }
 
     #[cfg(target_os = "windows")]
     let mut cmd = {
-        let mut command = Command::new(ffmpeg_path);
+        let mut command = Command::new(&ffmpeg_path);
         command.creation_flags(0x08000000); // CREATE_NO_WINDOW flag
         command
     };
 
     #[cfg(not(target_os = "windows"))]
-    let mut cmd = Command::new(ffmpeg_path);
+    let mut cmd = Command::new(&ffmpeg_path);
 
-    let status = cmd
+    let output = cmd
         .args(&[
             "-i", input_path,
             "-ss", &start_time.to_string(),
@@ -117,16 +126,18 @@ pub fn cut_segment(
             "-c:a", "copy",
             "-avoid_negative_ts", "make_zero",
             "-y",
-            output_path.to_str().unwrap()
+            output_path.to_str().unwrap(),
         ])
         .stdin(Stdio::null())
-        .stdout(Stdio::null())  // Hides console output
-        .stderr(Stdio::null())  // Hides error messages
-        .status()?;
+        .stdout(Stdio::piped())  // Capture FFmpeg output for debugging
+        .stderr(Stdio::piped())
+        .output()?;  // Run command and capture output
 
-    if !status.success() {
-        return Err(anyhow!("FFmpeg command failed"));
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(anyhow!("FFmpeg failed to cut segment: {}", stderr));
     }
 
     Ok(output_path.to_str().unwrap().to_string())
 }
+
