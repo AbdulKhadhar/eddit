@@ -9,7 +9,7 @@ mod utils;
 mod video;
 use commands::file::{select_directory, select_file};
 use commands::video::{
-    add_intro, add_intro_with_progress, compress_video, cut_video, cut_video_with_progress, get_video_metadata, load_video, process_video_with_progress, save_video
+    add_intro, add_intro_with_progress, compress_video, cut_video, cut_video_with_progress, get_video_metadata, load_video, process_video_with_progress, save_video, extract_frames
 };
 use commands::image::optimize_image;
 use std::collections::HashMap;
@@ -182,7 +182,8 @@ fn main() {
             select_directory,
             check_dependencies,
             start_video_server,
-            optimize_image
+            optimize_image,
+            extract_frames
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

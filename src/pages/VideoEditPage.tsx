@@ -13,11 +13,11 @@ import VideoPlayer from "../components/video/VideoPlayer"
 import Timeline from "../components/video/Timeline"
 import SegmentEditor from "../components/video/SegmentEditor"
 import CompressionSettings from "../components/video/CompressionSettings"
-import { loadVideo, selectFile, selectDirectory, processVideo, checkDependencies, cutVideo } from "../services/tauriApi"
+import { loadVideo, selectFile, selectDirectory, processVideo, checkDependencies, cutVideo, extractFrames } from "../services/tauriApi"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Folder, Download, RefreshCw, XCircle, AlertTriangle } from "lucide-react"
+import { Folder, Download, RefreshCw, XCircle, AlertTriangle, ImageIcon } from "lucide-react"
 import { SegmentProgress } from "@/types"
 
 
@@ -45,6 +45,8 @@ const VideoEditPage: React.FC = () => {
     const [elapsedTime, setElapsedTime] = useState(0)
     const [timer, setTimer] = useState<NodeJS.Timeout | null>(null)
     const [isCompressionEnabled, setIsCompressionEnabled] = useState(true); 
+    const [fps, setFps] = useState<number>(12);
+    const [isExtracting, setIsExtracting] = useState(false);
 
 
 
@@ -146,6 +148,31 @@ const VideoEditPage: React.FC = () => {
         } finally {
             setProcessingState(false);
             clearInterval(newTimer);
+        }
+    };
+    
+    const handleExtractFrames = async () => {
+        if (!videoPath || !outputDirectory) {
+            setError("Please select a video and an output directory first.");
+            return;
+        }
+
+        setIsExtracting(true);
+        setError(null);
+        setProgress({ index: 0, total: 1, status: "Extracting frames...", progress: 50 });
+
+        try {
+            const framesDir = await extractFrames(videoPath, outputDirectory, fps);
+            setProcessingResults([{
+                success: true,
+                output_path: framesDir,
+            }]);
+            setCurrentStep("process");
+        } catch (err) {
+            setError(`Error extracting frames: ${err}`);
+        } finally {
+            setIsExtracting(false);
+            setProgress(null);
         }
     };
     
@@ -327,9 +354,37 @@ const VideoEditPage: React.FC = () => {
                             </div>
 
                             <div className="mt-auto">
+                                <div className="mb-4 bg-gray-900 p-3 rounded-md">
+                                    <label className="text-gray-300 text-sm block mb-1">Frames Per Second (FPS)</label>
+                                    <Input 
+                                        type="number" 
+                                        value={fps} 
+                                        onChange={(e) => setFps(parseInt(e.target.value) || 12)}
+                                        className="bg-gray-800" 
+                                    />
+                                    <p className="text-xs text-gray-500 mt-1">Useful for scroll-trigger animations (e.g., 12, 24, 30)</p>
+                                </div>
+                                <Button
+                                    onClick={handleExtractFrames}
+                                    disabled={!outputDirectory || isProcessing || isExtracting}
+                                    className="w-full bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-medium text-lg flex items-center justify-center mb-4"
+                                >
+                                    {isExtracting ? (
+                                        <>
+                                            <RefreshCw className="w-5 h-5 mr-2 animate-spin" />
+                                            Extracting...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <ImageIcon className="w-5 h-5 mr-2" />
+                                            Extract Frames
+                                        </>
+                                    )}
+                                </Button>
+
                                 <Button
                                     onClick={handleProcessVideos}
-                                    disabled={!outputDirectory || segments.length === 0 || isProcessing}
+                                    disabled={!outputDirectory || segments.length === 0 || isProcessing || isExtracting}
                                     className="w-full bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium text-lg flex items-center justify-center"
                                 >
                                     {isProcessing ? (

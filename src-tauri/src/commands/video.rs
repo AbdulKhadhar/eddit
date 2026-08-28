@@ -560,3 +560,66 @@ pub async fn save_video(input_path: String, output_path: String) -> Result<(), S
         Err(e) => Err(format!("Failed to save video: {}", e)),
     }
 }
+
+#[command]
+pub async fn extract_frames(
+    input_path: String,
+    output_dir: String,
+    fps: Option<f32>,
+) -> Result<String, String> {
+    let ffmpeg_path = get_ffmpeg_path();
+
+    if !ffmpeg_path.exists() {
+        return Err(format!("FFmpeg not found at {:?}", ffmpeg_path));
+    }
+
+    let input_filename = Path::new(&input_path)
+        .file_stem()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_string();
+
+    let frames_dir = Path::new(&output_dir).join(format!("{}_frames", input_filename));
+    if !frames_dir.exists() {
+        std::fs::create_dir_all(&frames_dir).map_err(|e| format!("Failed to create frames directory: {}", e))?;
+    }
+
+    let output_pattern = frames_dir.join("frame_%04d.jpg");
+    let fps_str = fps.unwrap_or(12.0).to_string();
+
+    #[cfg(target_os = "windows")]
+    let mut command = {
+        let mut cmd = Command::new(&ffmpeg_path);
+        cmd.creation_flags(0x08000000); // Prevents command window from popping up
+        cmd
+    };
+
+    #[cfg(not(target_os = "windows"))]
+    let mut command = Command::new(&ffmpeg_path);
+
+    command
+        .args(&[
+            "-i",
+            &input_path,
+            "-vf",
+            &format!("fps={}", fps_str),
+            "-qscale:v",
+            "2", // High quality JPEG
+            output_pattern.to_str().unwrap(),
+        ])
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    let output = command
+        .output()
+        .await
+        .map_err(|e| format!("FFmpeg execution failed: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("FFmpeg frame extraction failed: {}", stderr));
+    }
+
+    Ok(frames_dir.to_str().unwrap().to_string())
+}

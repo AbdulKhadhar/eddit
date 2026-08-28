@@ -17,7 +17,13 @@ pub async fn select_file<R: Runtime>(window: tauri::Window<R>, filters: Option<V
 
     if let Some(filter_list) = filters {
         for filter in filter_list {
-            builder = builder.add_filter("Video Files", &["mp4", "mov", "avi", "mkv"]);
+            if filter == "Image Files" {
+                builder = builder.add_filter("Image Files", &["png", "jpg", "jpeg", "webp", "gif"]);
+            } else if filter == "Video Files" {
+                builder = builder.add_filter("Video Files", &["mp4", "mov", "avi", "mkv", "webm"]);
+            } else {
+                builder = builder.add_filter(&filter, &["*"]); // Fallback
+            }
         }
     } else {
         builder = builder.add_filter("Video Files", &["mp4", "mov", "avi", "mkv"]);
