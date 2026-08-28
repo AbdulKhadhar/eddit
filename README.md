@@ -131,7 +131,7 @@ If you find Eddit useful, please consider:
 - Sharing it with others who might benefit
 - Providing feedback through issues
 
-[![Buy Me A Coffee](https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png)](https://buymeacoffee.com/abdulkhadhar)
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-FFDD00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/abdulkhadhar)
 
 ## 📬 Contact
 
