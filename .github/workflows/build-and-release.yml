@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch:  # Allows manual trigger
+  workflow_dispatch:
 
 jobs:
   build-windows:
@@ -12,31 +12,39 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - name: Checkout Repository (Shallow Clone for Speed)
-        uses: actions/checkout@v7
+      - name: Checkout Repository
+        uses: actions/checkout@v4
         with:
-          fetch-depth: 1  # Faster checkout
+          fetch-depth: 1
 
       - name: Unzip ffmpeg and ffprobe
         run: |
-          Expand-Archive -Path src-tauri/bin/ffmpeg.zip -DestinationPath src-tauri/bin/
-          Expand-Archive -Path src-tauri/bin/ffprobe.zip -DestinationPath src-tauri/bin/
+          Expand-Archive -Path src-tauri/bin/ffmpeg.zip -DestinationPath src-tauri/bin/ -Force
+          Expand-Archive -Path src-tauri/bin/ffprobe.zip -DestinationPath src-tauri/bin/ -Force
 
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: '22'
 
-      - name: Install pnpm  # Install pnpm BEFORE caching dependencies
-        run: npm install -g pnpm
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Get pnpm store directory
+        shell: bash
+        id: pnpm-config
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
 
       - name: Restore pnpm Cache
         uses: actions/cache@v4
         with:
-          path: ~/.pnpm-store
-          key: pnpm-${{ runner.os }}-node-${{ steps.node.outputs.version }}-${{ hashFiles('pnpm-lock.yaml') }}
+          path: ${{ steps.pnpm-config.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
           restore-keys: |
-            pnpm-${{ runner.os }}-
+            ${{ runner.os }}-pnpm-store-
 
       - name: Install Dependencies
         run: pnpm install
@@ -51,19 +59,18 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            src-tauri/target
-            ~/.rustup  # Added Rust toolchain cache
-          key: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            src-tauri/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            rust-${{ runner.os }}-
+            ${{ runner.os }}-cargo-
 
       - name: Build Windows Executables (msi & exe)
         run: pnpm tauri build --ci
         env:
-          RUSTFLAGS: "-C target-cpu=native"  # Optimize for runner CPU
-          CARGO_INCREMENTAL: "1"  # Enable incremental builds
+          CARGO_INCREMENTAL: "1"
 
       - name: Upload MSI Artifact
         uses: actions/upload-artifact@v4
