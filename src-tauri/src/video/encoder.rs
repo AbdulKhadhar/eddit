@@ -50,6 +50,8 @@ pub fn compress_video(input_path: &str, output_dir: &str, settings: CompressionS
     command.args(&[
         "-c:a", "aac",
         "-b:a", "128k",
+        "-pix_fmt", "yuv420p",
+        "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",
         "-y",
         output_path.to_str().unwrap()
     ])
