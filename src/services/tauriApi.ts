@@ -170,6 +170,23 @@ export const addIntroWithProgress = async (
   });
 };
 
+export async function extractFrames(
+  inputPath: string,
+  outputDir: string,
+  fps: number | null
+): Promise<string> {
+  try {
+    return await invoke<string>('extract_frames', {
+      inputPath,
+      outputDir,
+      fps
+    });
+  } catch (error) {
+    console.error("Error extracting frames:", error);
+    throw error;
+  }
+}
+
 
 export async function processVideo(
   inputPath: string,
