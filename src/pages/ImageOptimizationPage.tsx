@@ -79,7 +79,7 @@ const ImageOptimizationPage: React.FC = () => {
                 return
             }
 
-            const newResults = []
+            const newResults: { path: string; success: boolean; error?: string }[] = []
             let count = 0
 
             // Process concurrently with the backend semaphore handling the load
