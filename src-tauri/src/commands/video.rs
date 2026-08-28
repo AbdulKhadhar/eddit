@@ -527,6 +527,10 @@ pub async fn compress_video(
             "aac",
             "-b:a",
             "128k",
+            "-pix_fmt",
+            "yuv420p",
+            "-vf",
+            "scale=trunc(iw/2)*2:trunc(ih/2)*2",
             "-y",
             final_output_path.to_str().unwrap(),
         ])
