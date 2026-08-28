@@ -37,6 +37,7 @@
 - **Video Cutting** - Segment videos with frame-accurate precision
 - **Custom Intro Addition** - Seamlessly add intro clips to each segment
 - **Video Compression** - Optimize file size while maintaining quality
+- **Image Optimization** - Convert, crop, resize, and compress images (WebP support)
 - **Batch Processing** - Handle multiple videos simultaneously
 - **Fast Performance** - Powered by FFmpeg for efficient processing
 - **Modern Interface** - Intuitive UI built with Tailwind CSS 4
