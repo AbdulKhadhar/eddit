@@ -118,13 +118,36 @@ export async function selectDirectory(): Promise<string | null> {
 }
 
 // New utility function to check if FFmpeg is available
-export async function checkDependencies(): Promise<{ffmpeg: boolean}> {
+export const checkDependencies = async (): Promise<Record<string, string>> => {
   try {
-    return await invoke<{ffmpeg: boolean}>('check_dependencies', {});
+    return await invoke('check_dependencies')
   } catch (error) {
-    console.error("Error checking dependencies:", error);
-    return { ffmpeg: false };
+    console.error('Error checking dependencies:', error)
+    return { error: String(error) }
   }
+}
+
+export interface ImageSettings {
+  quality: number
+  lossless: boolean
+  width: number | null
+  height: number | null
+  crop_w: number | null
+  crop_h: number | null
+  crop_x: number | null
+  crop_y: number | null
+}
+
+export const optimizeImage = async (
+  inputPath: string,
+  outputDir: string,
+  settings: ImageSettings
+): Promise<string> => {
+  return await invoke('optimize_image', {
+    inputPath,
+    outputDir,
+    settings,
+  })
 }
 
 export const addIntroWithProgress = async (
