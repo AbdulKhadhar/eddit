@@ -13,7 +13,7 @@ jobs:
 
     steps:
       - name: Checkout Repository (Shallow Clone for Speed)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 1  # Faster checkout
 
@@ -23,9 +23,9 @@ jobs:
           Expand-Archive -Path src-tauri/bin/ffprobe.zip -DestinationPath src-tauri/bin/
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: '22.14.0'
+          node-version: '24'
 
       - name: Install pnpm  # Install pnpm BEFORE caching dependencies
         run: npm install -g pnpm
@@ -103,8 +103,8 @@ jobs:
           files: |
             artifacts/msi/*.msi
             artifacts/exe/*.exe
-          tag_name: v0.1.0
-          name: Eddit v0.1.0
+          tag_name: v0.2.0
+          name: Eddit v0.2.0
           draft: false
           prerelease: false
         env:
